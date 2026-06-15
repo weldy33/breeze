@@ -240,6 +240,27 @@
   .backbtn{font-size:15px;font-weight:700;color:var(--ink-dim);padding:8px 10px 8px 0;}
   .backbtn:active{color:var(--ink);}
   hr.div{border:none;border-top:1px solid var(--line);margin:22px 0;}
+
+  /* Roster table */
+  .rtable{border:1px solid var(--line);border-radius:var(--r);overflow:hidden;}
+  .rhead{display:grid;grid-template-columns:1fr 110px 64px;background:var(--panel-2);border-bottom:1px solid var(--line);}
+  .rh{display:flex;align-items:center;gap:5px;font-family:var(--mono);font-size:11px;letter-spacing:.12em;
+    text-transform:uppercase;color:var(--ink-dim);padding:14px 16px;text-align:left;}
+  .rh-c,.rh-n{justify-content:flex-start;}
+  .rh:active{color:var(--ink);}
+  .rh .arr{font-size:10px;color:var(--signal);min-width:16px;font-family:var(--mono);font-weight:700;}
+  .rrow{display:grid;grid-template-columns:1fr 110px 64px;align-items:center;
+    border-bottom:1px solid var(--line);background:var(--panel);width:100%;text-align:left;padding:0;}
+  .rrow:last-child{border-bottom:none;}
+  .rrow:active{background:var(--panel-2);}
+  .rrow .rc{padding:14px 16px;}
+  .rrow .rname{font-size:16px;font-weight:700;letter-spacing:-.01em;}
+  .rrow .rteam{font-size:12px;color:var(--ink-faint);margin-top:2px;}
+  .rrow .rcolor{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--ink-dim);}
+  .swatch{width:14px;height:14px;border-radius:4px;border:1px solid var(--line);flex:none;}
+  .sw-Black{background:#000;} .sw-White{background:#f4f6f8;} .sw-Grey{background:#8b929e;} .sw-Red{background:var(--j-red);}
+  .rrow .rnum{font-family:var(--mono);font-size:18px;font-weight:800;}
+  .rrow .rnum.none{color:var(--ink-faint);font-size:13px;font-weight:600;}
 </style>
 </head>
 <body>
@@ -269,6 +290,13 @@
           <div>
             <div class="lbl">Data Entry</div>
             <div class="sub">Record measurables by station</div>
+          </div>
+        </button>
+        <button class="tile" data-go="roster" style="grid-column:1 / -1;min-height:96px;">
+          <div class="tag">Reference</div>
+          <div>
+            <div class="lbl">Roster</div>
+            <div class="sub">View all players, sort, edit jerseys</div>
           </div>
         </button>
       </div>
@@ -341,6 +369,45 @@
       <button class="cta ghost" id="entryNext">Save &amp; next player</button>
     </section>
 
+    <!-- ROSTER -->
+    <section id="view-roster" class="hidden">
+      <button class="backbtn" data-go="home">‹ Home</button>
+      <div class="section-h">Full roster · tap a player to edit jersey</div>
+      <input class="search" id="rosterFilter" placeholder="Filter by name" autocomplete="off" style="margin-bottom:12px">
+      <div class="rtable">
+        <div class="rhead">
+          <button class="rh" data-sort="name">Name<span class="arr" data-for="name"></span></button>
+          <button class="rh rh-c" data-sort="color">Color<span class="arr" data-for="color"></span></button>
+          <button class="rh rh-n" data-sort="number">#<span class="arr" data-for="number"></span></button>
+        </div>
+        <div id="rosterRows"></div>
+      </div>
+    </section>
+
+    <!-- JERSEY EDIT -->
+    <section id="view-jersey" class="hidden">
+      <button class="backbtn" data-go="roster">‹ Roster</button>
+      <div class="entry-head">
+        <div class="jersey lg" id="jEditChip">--</div>
+        <div>
+          <div class="ci-name" id="jEditName">Player</div>
+          <div class="ci-grad" id="jEditSub"></div>
+        </div>
+      </div>
+      <div class="section-h" style="margin-top:18px">Jersey color</div>
+      <div class="colorpick" id="jColorPick">
+        <button class="cp" data-c="Black">Black<small>0–99</small></button>
+        <button class="cp" data-c="White">White<small>0–99</small></button>
+        <button class="cp" data-c="Grey">Grey<small>0–99</small></button>
+        <button class="cp" data-c="Red">Red<small>0–99</small></button>
+      </div>
+      <div class="field"><div class="fl">Jersey number</div>
+        <input class="fin" id="jNumber" inputmode="numeric" maxlength="2" placeholder="0–99"></div>
+      <div id="jClash" class="empty hidden"></div>
+      <button class="cta ok" id="jSave">Save jersey</button>
+      <button class="cta ghost" id="jClear" style="color:var(--ink-dim)">Remove jersey (no jersey this event)</button>
+    </section>
+
     <!-- SETTINGS -->
     <section id="view-settings" class="hidden">
       <button class="backbtn" data-go="home">‹ Home</button>
@@ -400,14 +467,15 @@ function save(){localStorage.setItem(LS_ROSTER,JSON.stringify(roster));localStor
 function rec(id){ if(!data[id]) data[id]={checkedIn:false}; return data[id]; }
 
 /* ---------- view routing ---------- */
-const views=['home','checkin','cidetail','stations','lookup','entry','settings'];
-const crumbs={home:'Home',checkin:'Check-In',cidetail:'Check-In',stations:'Data Entry',lookup:'Data Entry',entry:'Data Entry',settings:'Setup'};
+const views=['home','checkin','cidetail','stations','lookup','entry','roster','jersey','settings'];
+const crumbs={home:'Home',checkin:'Check-In',cidetail:'Check-In',stations:'Data Entry',lookup:'Data Entry',entry:'Data Entry',roster:'Roster',jersey:'Roster',settings:'Setup'};
 function go(v){
   views.forEach(x=>document.getElementById('view-'+x).classList.toggle('hidden',x!==v));
   document.getElementById('crumb').textContent=crumbs[v]||'Home';
   if(v==='checkin'){document.getElementById('ciSearch').value='';renderCI('');setTimeout(()=>document.getElementById('ciSearch').focus(),50);}
   if(v==='settings') renderSettings();
   if(v==='home') renderHomeStatus();
+  if(v==='roster') renderRoster();
   window.scrollTo(0,0);
 }
 document.querySelectorAll('[data-go]').forEach(b=>b.addEventListener('click',()=>go(b.dataset.go)));
@@ -795,6 +863,105 @@ function parseCSV(text,delim){
 
 /* ---------- util ---------- */
 function esc(s){return String(s??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));}
+
+/* ---------- ROSTER VIEW ---------- */
+let sortStack=[{key:'name',dir:1}];  // last = primary; earlier = tiebreakers
+let rosterFilterTerm='';
+const colorOrder={Black:0,White:1,Grey:2,Red:3};
+document.getElementById('rosterFilter').addEventListener('input',e=>{rosterFilterTerm=e.target.value.trim().toLowerCase();renderRoster();});
+document.querySelectorAll('.rh').forEach(h=>h.addEventListener('click',()=>{
+  const k=h.dataset.sort;
+  const existing=sortStack.find(s=>s.key===k);
+  if(existing&&sortStack[sortStack.length-1].key===k){
+    existing.dir*=-1;                       // re-tapping the current primary flips direction
+  }else{
+    sortStack=sortStack.filter(s=>s.key!==k);   // remove if already in stack
+    sortStack.push({key:k,dir:1});              // add as new primary (end = primary)
+    if(sortStack.length>3)sortStack.shift();    // cap at 3 levels
+  }
+  renderRoster();
+}));
+function cmpKey(p,key){
+  if(key==='name')return p.name.toLowerCase();
+  if(key==='color')return p.color?(colorOrder[p.color]??9):99;
+  return (p.number!==''&&p.number!=null)?parseInt(p.number,10):999;
+}
+function renderRoster(){
+  const box=document.getElementById('rosterRows');box.innerHTML='';
+  document.querySelectorAll('.arr').forEach(a=>a.textContent='');
+  // primary is last in stack; show priority number when more than one level
+  sortStack.forEach((s,i)=>{
+    const arr=document.querySelector('.arr[data-for="'+s.key+'"]');if(!arr)return;
+    const priority=sortStack.length-i;              // 1 = primary
+    const dirGlyph=s.dir>0?'▲':'▼';
+    arr.textContent=sortStack.length>1?dirGlyph+priority:dirGlyph;
+  });
+  if(!roster.length){box.innerHTML='<div class="empty"><b>No roster loaded</b>Load your event CSV in Setup.</div>';return;}
+  let list=roster.slice();
+  if(rosterFilterTerm)list=list.filter(p=>p.name.toLowerCase().includes(rosterFilterTerm));
+  list.sort((a,b)=>{
+    for(let i=sortStack.length-1;i>=0;i--){       // primary (end) first
+      const s=sortStack[i];const av=cmpKey(a,s.key),bv=cmpKey(b,s.key);
+      if(av<bv)return -1*s.dir;if(av>bv)return 1*s.dir;
+    }
+    return a.name.toLowerCase()<b.name.toLowerCase()?-1:1;  // final stable tiebreak
+  });
+  if(!list.length){box.innerHTML='<div class="empty">No players match that filter.</div>';return;}
+  list.forEach(p=>{
+    const btn=document.createElement('button');btn.className='rrow';
+    const hasJ=p.color&&p.number!==''&&p.number!=null;
+    btn.innerHTML=`<div class="rc"><div class="rname">${esc(p.name)}</div>${p.team?'<div class="rteam">'+esc(p.team)+'</div>':''}</div>`+
+      `<div class="rc"><div class="rcolor">${p.color?'<span class="swatch sw-'+p.color+'"></span>'+esc(p.color):'<span style="color:var(--ink-faint)">—</span>'}</div></div>`+
+      `<div class="rc"><span class="rnum${hasJ?'':' none'}">${hasJ?p.number:'—'}</span></div>`;
+    btn.addEventListener('click',()=>openJerseyEdit(p.id));
+    box.appendChild(btn);
+  });
+}
+
+/* ---------- JERSEY EDIT ---------- */
+let jEditId=null, jEditColor=null;
+function openJerseyEdit(id){
+  jEditId=id;const p=roster.find(x=>x.id===id);
+  jEditColor=p.color||null;
+  const chip=document.getElementById('jEditChip');
+  chip.className='jersey lg '+(p.color?'j-'+p.color:'nojersey');chip.textContent=p.color?p.number:'—';
+  document.getElementById('jEditName').textContent=p.name;
+  document.getElementById('jEditSub').textContent=[p.team,p.grad].filter(Boolean).join(' · ')||'\u00a0';
+  document.getElementById('jNumber').value=(p.number!==''&&p.number!=null)?p.number:'';
+  document.querySelectorAll('#jColorPick .cp').forEach(c=>{
+    const on=c.dataset.c===jEditColor;c.classList.toggle('sel',on);c.classList.toggle('dim',jEditColor&&!on);
+  });
+  document.getElementById('jClash').classList.add('hidden');
+  go('jersey');
+}
+document.querySelectorAll('#jColorPick .cp').forEach(c=>c.addEventListener('click',()=>{
+  jEditColor=c.dataset.c;
+  document.querySelectorAll('#jColorPick .cp').forEach(x=>{x.classList.toggle('sel',x===c);x.classList.toggle('dim',x!==c);});
+  liveClash();
+}));
+document.getElementById('jNumber').addEventListener('input',e=>{e.target.value=e.target.value.replace(/[^0-9]/g,'').slice(0,2);liveClash();});
+function liveClash(){
+  const num=cleanNum(document.getElementById('jNumber').value);
+  const clash=document.getElementById('jClash');
+  if(jEditColor&&num!==''){
+    const other=roster.find(x=>x.id!==jEditId&&x.color===jEditColor&&String(x.number)===num);
+    if(other){clash.classList.remove('hidden');clash.innerHTML=`<b>${jEditColor} ${num} is taken</b>${esc(other.name)} already has this jersey. Change one of them before saving.`;return false;}
+  }
+  clash.classList.add('hidden');return true;
+}
+document.getElementById('jSave').addEventListener('click',()=>{
+  const p=roster.find(x=>x.id===jEditId);
+  const num=cleanNum(document.getElementById('jNumber').value);
+  if(!jEditColor){toast('Pick a color, or use Remove jersey',true);return;}
+  if(num===''){toast('Enter a number 0–99, or use Remove jersey',true);return;}
+  if(!liveClash())return;
+  p.color=jEditColor;p.number=num;save();toast('Jersey updated: '+p.name+' → '+jEditColor+' '+num);go('roster');
+});
+document.getElementById('jClear').addEventListener('click',()=>{
+  const p=roster.find(x=>x.id===jEditId);
+  if(!confirm(p.name+': remove jersey assignment for this event?'))return;
+  p.color='';p.number='';save();toast('Jersey removed: '+p.name);go('roster');
+});
 
 refreshCounts();renderHomeStatus();
 </script>
