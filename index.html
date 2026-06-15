@@ -1,0 +1,801 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="PBR Event">
+<title>PBR Event Ops</title>
+<style>
+  :root{
+    --bg:#0a0b0d; --panel:#131519; --panel-2:#1b1e24; --line:#272b33;
+    --ink:#f4f6f8; --ink-dim:#8b929e; --ink-faint:#5a616c;
+    --signal:#e6332a; --ok:#34d399; --warn:#fbbf24;
+    --j-black:#0a0b0d; --j-white:#f4f6f8; --j-grey:#8b929e; --j-red:#e6332a;
+    --r:14px; --tap:64px;
+    --mono:ui-monospace,"SF Mono",Menlo,monospace;
+    --sans:-apple-system,BlinkMacSystemFont,"Segoe UI",Inter,sans-serif;
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+  html,body{margin:0;height:100%;overflow:hidden;}
+  body{
+    background:var(--bg);color:var(--ink);font-family:var(--sans);
+    font-size:17px;-webkit-text-size-adjust:100%;
+    padding-top:env(safe-area-inset-top);
+    display:flex;flex-direction:column;height:100dvh;
+  }
+  button{font-family:inherit;color:inherit;border:none;background:none;cursor:pointer;}
+  .hidden{display:none!important;}
+
+  /* Top bar */
+  header{
+    display:flex;align-items:center;gap:14px;padding:14px 18px;
+    border-bottom:1px solid var(--line);background:var(--panel);flex:none;
+  }
+  .brand{font-weight:800;letter-spacing:.14em;font-size:13px;color:var(--ink-dim);}
+  .brand b{color:var(--signal);}
+  .crumb{font-weight:700;font-size:18px;letter-spacing:-.01em;margin-left:2px;}
+  .spacer{flex:1;}
+  .pill{
+    font-family:var(--mono);font-size:12px;color:var(--ink-dim);
+    border:1px solid var(--line);border-radius:999px;padding:6px 12px;white-space:nowrap;
+  }
+  .pill b{color:var(--ok);}
+  .iconbtn{
+    min-width:44px;height:44px;border-radius:10px;border:1px solid var(--line);
+    background:var(--panel-2);display:flex;align-items:center;justify-content:center;
+    font-size:14px;font-weight:600;color:var(--ink-dim);padding:0 14px;
+  }
+
+  /* Scroll body */
+  main{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:18px;}
+  .wrap{max-width:760px;margin:0 auto;}
+
+  /* Home tiles */
+  .home-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;}
+  .tile{
+    background:var(--panel);border:1px solid var(--line);border-radius:var(--r);
+    padding:26px 20px;text-align:left;min-height:148px;display:flex;flex-direction:column;
+    justify-content:space-between;transition:transform .08s,border-color .15s;
+  }
+  .tile:active{transform:scale(.98);border-color:var(--signal);}
+  .tile .lbl{font-size:24px;font-weight:800;letter-spacing:-.02em;}
+  .tile .sub{font-size:13px;color:var(--ink-dim);margin-top:4px;}
+  .tile .tag{
+    font-family:var(--mono);font-size:11px;color:var(--ink-faint);
+    text-transform:uppercase;letter-spacing:.12em;
+  }
+  .home-grid.stations .tile{min-height:128px;}
+
+  .section-h{
+    font-family:var(--mono);font-size:11px;letter-spacing:.18em;text-transform:uppercase;
+    color:var(--ink-faint);margin:6px 2px 12px;
+  }
+
+  /* Search */
+  .search{
+    width:100%;height:var(--tap);border-radius:12px;background:var(--panel);
+    border:1px solid var(--line);color:var(--ink);font-size:20px;padding:0 18px;
+    font-weight:600;letter-spacing:-.01em;
+  }
+  .search::placeholder{color:var(--ink-faint);font-weight:500;}
+  .search:focus{outline:none;border-color:var(--signal);}
+
+  /* Roster rows */
+  .row{
+    display:flex;align-items:center;gap:14px;width:100%;text-align:left;
+    background:var(--panel);border:1px solid var(--line);border-radius:12px;
+    padding:14px 16px;margin-top:10px;
+  }
+  .row:active{border-color:var(--signal);}
+  .row .name{font-size:18px;font-weight:700;letter-spacing:-.01em;}
+  .row .meta{font-size:13px;color:var(--ink-dim);margin-top:2px;}
+  .row .meta .pos{color:var(--ink-faint);}
+
+  /* Jersey chip */
+  .jersey{
+    display:flex;align-items:center;justify-content:center;flex:none;
+    width:54px;height:54px;border-radius:11px;font-family:var(--mono);
+    font-weight:800;font-size:20px;border:2px solid var(--line);
+  }
+  .j-Black{background:#000;color:#fff;border-color:#33363d;}
+  .j-White{background:#f4f6f8;color:#0a0b0d;border-color:#c8ccd2;}
+  .j-Grey{background:#8b929e;color:#0a0b0d;border-color:#a7adb7;}
+  .j-Red{background:var(--j-red);color:#fff;border-color:#ff5d54;}
+  .jersey.lg{width:84px;height:84px;font-size:34px;border-radius:16px;}
+  .nojersey{background:var(--panel-2);color:var(--ink-faint);border-style:dashed;}
+
+  .status-dot{margin-left:auto;font-family:var(--mono);font-size:11px;
+    text-transform:uppercase;letter-spacing:.1em;color:var(--ink-faint);}
+  .status-dot.in{color:var(--ok);}
+
+  .empty{
+    text-align:center;color:var(--ink-faint);padding:48px 20px;font-size:15px;line-height:1.5;
+  }
+  .empty b{color:var(--ink-dim);display:block;font-size:17px;margin-bottom:6px;}
+
+  /* Check-in detail card */
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:var(--r);padding:22px;}
+  .ci-top{display:flex;align-items:center;gap:18px;}
+  .ci-name{font-size:26px;font-weight:800;letter-spacing:-.02em;line-height:1.1;}
+  .ci-grad{font-size:14px;color:var(--ink-dim);margin-top:4px;}
+  .ci-block{margin-top:20px;}
+  .ci-block .k{font-family:var(--mono);font-size:11px;letter-spacing:.16em;
+    text-transform:uppercase;color:var(--ink-faint);margin-bottom:8px;}
+  .poslist{display:flex;flex-wrap:wrap;gap:8px;}
+  .poschip{font-size:14px;font-weight:600;background:var(--panel-2);
+    border:1px solid var(--line);border-radius:8px;padding:8px 13px;}
+  .assign-line{display:flex;align-items:center;gap:14px;}
+  .assign-line .txt .clr{font-size:13px;color:var(--ink-dim);font-family:var(--mono);
+    text-transform:uppercase;letter-spacing:.08em;}
+  .assign-line .txt .big{font-size:24px;font-weight:800;}
+
+  /* Big primary action */
+  .cta{
+    width:100%;height:var(--tap);border-radius:12px;background:var(--signal);
+    color:#fff;font-size:19px;font-weight:800;letter-spacing:.01em;margin-top:22px;
+  }
+  .cta:active{filter:brightness(.9);}
+  .cta.ghost{background:var(--panel-2);border:1px solid var(--line);color:var(--ink);}
+  .cta.ok{background:var(--ok);color:#04150e;}
+  .cta:disabled{opacity:.4;}
+
+  /* Color picker (data entry) */
+  .colorpick{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;}
+  .cp{
+    height:72px;border-radius:12px;border:2px solid var(--line);
+    font-weight:800;font-size:14px;display:flex;align-items:center;justify-content:center;
+    flex-direction:column;gap:4px;
+  }
+  .cp small{font-family:var(--mono);font-size:10px;opacity:.7;letter-spacing:.1em;}
+  .cp[data-c="Black"]{background:#000;color:#fff;}
+  .cp[data-c="White"]{background:#f4f6f8;color:#000;}
+  .cp[data-c="Grey"]{background:#8b929e;color:#000;}
+  .cp[data-c="Red"]{background:var(--j-red);color:#fff;}
+  .cp.sel{border-color:var(--ink);box-shadow:0 0 0 3px rgba(244,246,248,.25);}
+  .cp.dim{opacity:.34;}
+
+  /* Numpad */
+  .numwrap{margin-top:16px;}
+  .numdisplay{
+    height:78px;border-radius:12px;background:var(--panel);border:1px solid var(--line);
+    display:flex;align-items:center;justify-content:center;gap:16px;
+  }
+  .numdisplay .nv{font-family:var(--mono);font-size:42px;font-weight:800;letter-spacing:.04em;}
+  .numdisplay .ph{color:var(--ink-faint);}
+  .numpad{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:12px;}
+  .key{
+    height:62px;border-radius:12px;background:var(--panel-2);border:1px solid var(--line);
+    font-family:var(--mono);font-size:26px;font-weight:700;
+  }
+  .key:active{background:var(--signal);border-color:var(--signal);}
+  .key.fn{font-size:16px;font-weight:600;color:var(--ink-dim);}
+
+  /* Data-entry value inputs */
+  .reps{display:flex;flex-direction:column;gap:10px;}
+  .rep{
+    display:flex;align-items:center;gap:12px;background:var(--panel);
+    border:1px solid var(--line);border-radius:12px;padding:8px 8px 8px 16px;
+  }
+  .rep .rl{font-family:var(--mono);font-size:12px;color:var(--ink-faint);width:54px;
+    text-transform:uppercase;letter-spacing:.1em;}
+  .rep input{
+    flex:1;height:var(--tap);background:transparent;border:none;color:var(--ink);
+    font-family:var(--mono);font-size:30px;font-weight:800;text-align:center;width:100%;
+  }
+  .rep input:focus{outline:none;}
+  .rep .unit{font-family:var(--mono);font-size:14px;color:var(--ink-faint);width:48px;}
+  .addrep{
+    width:100%;height:52px;border-radius:12px;background:var(--panel-2);
+    border:1px dashed var(--line);color:var(--ink-dim);font-weight:700;font-size:15px;margin-top:4px;
+  }
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+  .field .fl{font-family:var(--mono);font-size:11px;letter-spacing:.14em;text-transform:uppercase;
+    color:var(--ink-faint);margin:14px 2px 8px;}
+  .fin{
+    width:100%;height:var(--tap);background:var(--panel);border:1px solid var(--line);
+    border-radius:12px;color:var(--ink);font-family:var(--mono);font-size:26px;font-weight:800;
+    text-align:center;padding:0 8px;
+  }
+  .fin:focus{outline:none;border-color:var(--signal);}
+  .seg{display:flex;gap:8px;}
+  .seg button{flex:1;height:var(--tap);border-radius:12px;background:var(--panel);
+    border:1px solid var(--line);font-weight:800;font-size:20px;color:var(--ink-dim);}
+  .seg button.sel{background:var(--signal);border-color:var(--signal);color:#fff;}
+
+  .entry-head{display:flex;align-items:center;gap:16px;margin-bottom:18px;}
+  .entry-head .ci-name{font-size:22px;}
+  .saved-flash{
+    position:fixed;left:50%;bottom:calc(28px + env(safe-area-inset-bottom));transform:translateX(-50%);
+    background:var(--ok);color:#04150e;font-weight:800;padding:14px 26px;border-radius:999px;
+    font-size:16px;box-shadow:0 8px 30px rgba(0,0,0,.5);opacity:0;pointer-events:none;
+    transition:opacity .2s,transform .2s;z-index:50;
+  }
+  .saved-flash.show{opacity:1;transform:translateX(-50%) translateY(-6px);}
+
+  /* Settings / roster load */
+  .drop{
+    border:1px dashed var(--line);border-radius:var(--r);padding:30px 20px;text-align:center;
+    background:var(--panel);color:var(--ink-dim);
+  }
+  .mini{font-size:13px;color:var(--ink-dim);line-height:1.55;}
+  .danger{color:var(--signal);}
+  label.file{
+    display:inline-block;background:var(--panel-2);border:1px solid var(--line);
+    border-radius:10px;padding:14px 22px;font-weight:700;margin-top:14px;
+  }
+  table.prev{width:100%;border-collapse:collapse;margin-top:14px;font-size:13px;}
+  table.prev th,table.prev td{border-bottom:1px solid var(--line);padding:8px 6px;text-align:left;}
+  table.prev th{font-family:var(--mono);font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-faint);}
+  .toast{
+    position:fixed;left:50%;top:calc(70px + env(safe-area-inset-top));transform:translateX(-50%);
+    background:var(--panel-2);border:1px solid var(--line);color:var(--ink);
+    padding:12px 20px;border-radius:10px;font-size:14px;z-index:60;opacity:0;transition:opacity .2s;white-space:nowrap;
+  }
+  .toast.show{opacity:1;}
+  .toast.err{border-color:var(--signal);color:#ffb4af;}
+
+  .backbtn{font-size:15px;font-weight:700;color:var(--ink-dim);padding:8px 10px 8px 0;}
+  .backbtn:active{color:var(--ink);}
+  hr.div{border:none;border-top:1px solid var(--line);margin:22px 0;}
+</style>
+</head>
+<body>
+<header>
+  <div class="brand">PREP<b>BASEBALL</b></div>
+  <div class="crumb" id="crumb">Home</div>
+  <div class="spacer"></div>
+  <div class="pill" id="rosterPill">Roster: <b id="rosterCount">0</b></div>
+  <button class="iconbtn" id="navSettings">Setup</button>
+</header>
+
+<main>
+  <div class="wrap">
+
+    <!-- HOME -->
+    <section id="view-home">
+      <div class="home-grid">
+        <button class="tile" data-go="checkin">
+          <div class="tag">Front desk</div>
+          <div>
+            <div class="lbl">Check-In</div>
+            <div class="sub">Find a player, hand off jersey</div>
+          </div>
+        </button>
+        <button class="tile" data-go="stations">
+          <div class="tag">Stations</div>
+          <div>
+            <div class="lbl">Data Entry</div>
+            <div class="sub">Record measurables by station</div>
+          </div>
+        </button>
+      </div>
+      <div id="homeStatus" class="empty hidden"></div>
+    </section>
+
+    <!-- CHECK-IN -->
+    <section id="view-checkin" class="hidden">
+      <button class="backbtn" data-go="home">‹ Home</button>
+      <div class="section-h">Check-In · search by name</div>
+      <input class="search" id="ciSearch" placeholder="Type a player's name" autocomplete="off" autocapitalize="words">
+      <div id="ciResults"></div>
+    </section>
+
+    <!-- CHECK-IN DETAIL -->
+    <section id="view-cidetail" class="hidden">
+      <button class="backbtn" data-go="checkin">‹ Search</button>
+      <div class="card" id="ciCard"></div>
+    </section>
+
+    <!-- STATIONS -->
+    <section id="view-stations" class="hidden">
+      <button class="backbtn" data-go="home">‹ Home</button>
+      <div class="section-h">Choose your station</div>
+      <div class="home-grid stations">
+        <button class="tile" data-station="Infield"><div class="tag">Velocity</div><div><div class="lbl">Infield</div><div class="sub">Throw velo reps</div></div></button>
+        <button class="tile" data-station="Outfield"><div class="tag">Velocity</div><div><div class="lbl">Outfield</div><div class="sub">Throw velo reps</div></div></button>
+        <button class="tile" data-station="Catching"><div class="tag">Velo + Pop</div><div><div class="lbl">Catching</div><div class="sub">Velo reps, pop time</div></div></button>
+        <button class="tile" data-station="Physical"><div class="tag">Measurements</div><div><div class="lbl">Physical</div><div class="sub">Ht, wt, grip, 60</div></div></button>
+      </div>
+    </section>
+
+    <!-- STATION LOOKUP -->
+    <section id="view-lookup" class="hidden">
+      <button class="backbtn" data-go="stations">‹ Stations</button>
+      <div class="section-h" id="lookupTitle">Infield · pull up a player</div>
+      <div class="section-h" style="margin-top:18px">Jersey color</div>
+      <div class="colorpick" id="colorPick">
+        <button class="cp" data-c="Black">Black<small>0–99</small></button>
+        <button class="cp" data-c="White">White<small>0–99</small></button>
+        <button class="cp" data-c="Grey">Grey<small>0–99</small></button>
+        <button class="cp" data-c="Red">Red<small>0–99</small></button>
+      </div>
+      <div class="numwrap">
+        <div class="section-h" style="margin:14px 2px 0">Jersey number</div>
+        <div class="numdisplay"><span class="nv ph" id="numDisp">––</span></div>
+        <div class="numpad" id="numpad">
+          <button class="key" data-k="1">1</button><button class="key" data-k="2">2</button><button class="key" data-k="3">3</button>
+          <button class="key" data-k="4">4</button><button class="key" data-k="5">5</button><button class="key" data-k="6">6</button>
+          <button class="key" data-k="7">7</button><button class="key" data-k="8">8</button><button class="key" data-k="9">9</button>
+          <button class="key fn" data-k="clr">Clear</button><button class="key" data-k="0">0</button><button class="key fn" data-k="del">Del</button>
+        </div>
+      </div>
+      <button class="cta" id="lookupGo" disabled>Pull up player</button>
+      <div id="lookupMiss" class="empty hidden"></div>
+    </section>
+
+    <!-- DATA ENTRY -->
+    <section id="view-entry" class="hidden">
+      <button class="backbtn" id="entryBack">‹ Back</button>
+      <div class="entry-head">
+        <div class="jersey lg" id="entryJersey">--</div>
+        <div>
+          <div class="ci-name" id="entryName">Player</div>
+          <div class="ci-grad" id="entrySub"></div>
+        </div>
+      </div>
+      <div id="entryFields"></div>
+      <button class="cta ok" id="entrySave">Save</button>
+      <button class="cta ghost" id="entryNext">Save &amp; next player</button>
+    </section>
+
+    <!-- SETTINGS -->
+    <section id="view-settings" class="hidden">
+      <button class="backbtn" data-go="home">‹ Home</button>
+      <div class="section-h">Event roster</div>
+      <div class="card">
+        <div class="mini" id="rosterSummary">No roster loaded yet.</div>
+        <label class="file">Load roster CSV<input type="file" id="csvInput" accept=".csv" hidden></label>
+        <button class="iconbtn" id="addManual" style="margin-left:10px;height:auto;padding:14px 18px;">Add player manually</button>
+        <div id="csvPreview"></div>
+      </div>
+
+      <hr class="div">
+      <div class="section-h">Export results</div>
+      <div class="card">
+        <div class="mini">Each iPad exports its own results. Merge the per-station files after the event — every column is included so they stack cleanly.</div>
+        <div class="grid2" style="margin-top:14px">
+          <button class="cta ghost" data-export="all">Export all measurables</button>
+          <button class="cta ghost" data-export="checkin">Export check-in log</button>
+        </div>
+        <div class="grid2" style="margin-top:10px">
+          <button class="cta ghost" data-export="Infield">Infield only</button>
+          <button class="cta ghost" data-export="Outfield">Outfield only</button>
+          <button class="cta ghost" data-export="Catching">Catching only</button>
+          <button class="cta ghost" data-export="Physical">Physical only</button>
+        </div>
+      </div>
+
+      <hr class="div">
+      <div class="section-h">Expected CSV columns</div>
+      <div class="card mini">
+        <b>name</b>, <b>jersey_color</b> (Black/White/Grey/Red or blank), <b>jersey_number</b> (0–99 or blank),
+        <b>positions</b> (separate multiples with ; ), and optional <b>grad_year</b>, <b>team</b>.
+        Header names are matched loosely (case/spacing/underscores ignored). Players with no jersey are found by name at check-in.
+      </div>
+
+      <hr class="div">
+      <div class="section-h danger">Reset</div>
+      <div class="card">
+        <div class="mini">Clears all data on <i>this</i> iPad only.</div>
+        <button class="cta ghost danger-btn" id="resetAll" style="margin-top:14px;color:var(--signal);border-color:var(--signal);">Erase this device's data</button>
+      </div>
+    </section>
+
+  </div>
+</main>
+
+<div class="toast" id="toast"></div>
+<div class="saved-flash" id="savedFlash">Saved</div>
+
+<script>
+/* ---------- storage ---------- */
+const LS_ROSTER='pbr_roster_v1', LS_DATA='pbr_data_v1';
+let roster = load(LS_ROSTER, []);   // [{id,name,color,number,positions:[],grad,team}]
+let data   = load(LS_DATA, {});     // { id: {checkedIn, Infield, Outfield, Catching, Physical} }
+function load(k,f){try{return JSON.parse(localStorage.getItem(k))??f}catch(e){return f}}
+function save(){localStorage.setItem(LS_ROSTER,JSON.stringify(roster));localStorage.setItem(LS_DATA,JSON.stringify(data));}
+function rec(id){ if(!data[id]) data[id]={checkedIn:false}; return data[id]; }
+
+/* ---------- view routing ---------- */
+const views=['home','checkin','cidetail','stations','lookup','entry','settings'];
+const crumbs={home:'Home',checkin:'Check-In',cidetail:'Check-In',stations:'Data Entry',lookup:'Data Entry',entry:'Data Entry',settings:'Setup'};
+function go(v){
+  views.forEach(x=>document.getElementById('view-'+x).classList.toggle('hidden',x!==v));
+  document.getElementById('crumb').textContent=crumbs[v]||'Home';
+  if(v==='checkin'){document.getElementById('ciSearch').value='';renderCI('');setTimeout(()=>document.getElementById('ciSearch').focus(),50);}
+  if(v==='settings') renderSettings();
+  if(v==='home') renderHomeStatus();
+  window.scrollTo(0,0);
+}
+document.querySelectorAll('[data-go]').forEach(b=>b.addEventListener('click',()=>go(b.dataset.go)));
+document.getElementById('navSettings').addEventListener('click',()=>go('settings'));
+
+/* ---------- helpers ---------- */
+const COLORS=['Black','White','Grey','Red'];
+const norm=s=>(s||'').toString().trim();
+const keyJersey=(c,n)=>`${c}#${n}`;
+function jerseyEl(p,lg){
+  const d=document.createElement('div');
+  if(p.color&&p.number!==''&&p.number!=null){d.className='jersey j-'+p.color+(lg?' lg':'');d.textContent=p.number;}
+  else{d.className='jersey nojersey'+(lg?' lg':'');d.textContent='—';}
+  return d;
+}
+function toast(msg,err){const t=document.getElementById('toast');t.textContent=msg;t.className='toast show'+(err?' err':'');setTimeout(()=>t.className='toast',1900);}
+function flash(){const f=document.getElementById('savedFlash');f.className='saved-flash show';setTimeout(()=>f.className='saved-flash',1100);}
+function refreshCounts(){document.getElementById('rosterCount').textContent=roster.length;}
+
+/* ---------- HOME status ---------- */
+function renderHomeStatus(){
+  const el=document.getElementById('homeStatus');
+  if(!roster.length){el.classList.remove('hidden');el.innerHTML='<b>No roster loaded</b>Open Setup to load your event CSV before the event starts.';}
+  else el.classList.add('hidden');
+}
+
+/* ---------- CHECK-IN ---------- */
+const ciSearch=document.getElementById('ciSearch');
+ciSearch.addEventListener('input',()=>renderCI(ciSearch.value));
+function renderCI(q){
+  const box=document.getElementById('ciResults');box.innerHTML='';
+  if(!roster.length){box.innerHTML='<div class="empty"><b>No roster loaded</b>Load your event CSV in Setup.</div>';return;}
+  const term=q.trim().toLowerCase();
+  if(!term){box.innerHTML='<div class="empty">Start typing a name to find a player.</div>';return;}
+  const hits=roster.filter(p=>p.name.toLowerCase().includes(term)).slice(0,40);
+  if(!hits.length){box.innerHTML='<div class="empty"><b>No match</b>Check spelling, or add the player in Setup.</div>';return;}
+  hits.forEach(p=>{
+    const r=rec(p.id);
+    const btn=document.createElement('button');btn.className='row';
+    btn.appendChild(jerseyEl(p));
+    const mid=document.createElement('div');
+    mid.innerHTML=`<div class="name">${esc(p.name)}</div><div class="meta">${p.color?esc(p.color)+' '+p.number:'No jersey'}${p.positions.length?' · <span class="pos">'+p.positions.map(esc).join(', ')+'</span>':''}</div>`;
+    btn.appendChild(mid);
+    const st=document.createElement('div');st.className='status-dot'+(r.checkedIn?' in':'');st.textContent=r.checkedIn?'Checked in':'';
+    btn.appendChild(st);
+    btn.addEventListener('click',()=>openCIDetail(p.id));
+    box.appendChild(btn);
+  });
+}
+function openCIDetail(id){
+  const p=roster.find(x=>x.id===id);const r=rec(id);
+  const c=document.getElementById('ciCard');c.innerHTML='';
+  const top=document.createElement('div');top.className='ci-top';
+  top.appendChild(jerseyEl(p,true));
+  const info=document.createElement('div');
+  info.innerHTML=`<div class="ci-name">${esc(p.name)}</div><div class="ci-grad">${[p.team&&esc(p.team),p.grad&&('Class of '+esc(p.grad))].filter(Boolean).join(' · ')||'&nbsp;'}</div>`;
+  top.appendChild(info);c.appendChild(top);
+
+  const assign=document.createElement('div');assign.className='ci-block';
+  assign.innerHTML='<div class="k">Jersey assignment</div>';
+  const al=document.createElement('div');al.className='assign-line';
+  if(p.color){al.innerHTML=`<div class="txt"><div class="clr">${esc(p.color)}</div><div class="big">No. ${p.number}</div></div>`;}
+  else{al.innerHTML=`<div class="txt"><div class="clr">No jersey at this event</div></div>`;}
+  assign.appendChild(al);c.appendChild(assign);
+
+  const pos=document.createElement('div');pos.className='ci-block';
+  pos.innerHTML='<div class="k">Signed up for</div>';
+  const pl=document.createElement('div');pl.className='poslist';
+  if(p.positions.length)p.positions.forEach(x=>{const s=document.createElement('span');s.className='poschip';s.textContent=x;pl.appendChild(s);});
+  else pl.innerHTML='<span class="poschip" style="color:var(--ink-faint)">No positions listed</span>';
+  pos.appendChild(pl);c.appendChild(pos);
+
+  const cta=document.createElement('button');
+  cta.className='cta'+(r.checkedIn?' ghost':' ok');
+  cta.textContent=r.checkedIn?'Undo check-in':'Check in player';
+  cta.addEventListener('click',()=>{r.checkedIn=!r.checkedIn;if(r.checkedIn)r.checkinAt=Date.now();save();toast(r.checkedIn?'Checked in: '+p.name:'Check-in removed');go('checkin');});
+  c.appendChild(cta);
+  go('cidetail');
+}
+
+/* ---------- STATIONS / LOOKUP ---------- */
+let station=null, pickColor=null, pickNum='';
+document.querySelectorAll('[data-station]').forEach(b=>b.addEventListener('click',()=>{
+  station=b.dataset.station;pickColor=null;pickNum='';
+  document.getElementById('lookupTitle').textContent=station+' · pull up a player';
+  document.querySelectorAll('.cp').forEach(c=>c.classList.remove('sel','dim'));
+  updateNum();document.getElementById('lookupMiss').classList.add('hidden');
+  go('lookup');
+}));
+document.querySelectorAll('.cp').forEach(c=>c.addEventListener('click',()=>{
+  pickColor=c.dataset.c;
+  document.querySelectorAll('.cp').forEach(x=>{x.classList.toggle('sel',x===c);x.classList.toggle('dim',x!==c);});
+  validateLookup();
+}));
+document.getElementById('numpad').addEventListener('click',e=>{
+  const k=e.target.closest('.key');if(!k)return;const v=k.dataset.k;
+  if(v==='clr')pickNum='';
+  else if(v==='del')pickNum=pickNum.slice(0,-1);
+  else if(pickNum.length<2)pickNum+=v;
+  updateNum();
+});
+function updateNum(){
+  const d=document.getElementById('numDisp');
+  d.textContent=pickNum===''?'––':pickNum;d.classList.toggle('ph',pickNum==='');
+  validateLookup();
+}
+function validateLookup(){document.getElementById('lookupGo').disabled=!(pickColor&&pickNum!=='');}
+document.getElementById('lookupGo').addEventListener('click',()=>{
+  const n=String(parseInt(pickNum,10));
+  const p=roster.find(x=>x.color===pickColor&&String(x.number)===n);
+  const miss=document.getElementById('lookupMiss');
+  if(!p){miss.classList.remove('hidden');miss.innerHTML=`<b>No ${pickColor} ${pickNum} on the roster</b>Double-check the color and number, or load an updated roster in Setup.`;return;}
+  miss.classList.add('hidden');openEntry(p.id);
+});
+
+/* ---------- DATA ENTRY ---------- */
+let entryId=null;
+const VELO_DEFAULT=5;
+function openEntry(id){
+  entryId=id;const p=roster.find(x=>x.id===id);const r=rec(id);
+  const j=document.getElementById('entryJersey');
+  j.className='jersey lg '+(p.color?'j-'+p.color:'nojersey');j.textContent=p.color?p.number:'—';
+  document.getElementById('entryName').textContent=p.name;
+  document.getElementById('entrySub').textContent=[p.color?p.color+' '+p.number:'No jersey',p.team,p.grad,station].filter(Boolean).join(' · ');
+  buildFields(station,r);
+  go('entry');
+}
+document.getElementById('entryBack').addEventListener('click',()=>go('lookup'));
+
+function buildFields(st,r){
+  const wrap=document.getElementById('entryFields');wrap.innerHTML='';
+  const d=r[st]||{};
+  if(st==='Infield'||st==='Outfield'){
+    wrap.appendChild(veloBlock(d.velos||Array(VELO_DEFAULT).fill(''),'mph'));
+  }else if(st==='Catching'){
+    wrap.appendChild(veloBlock(d.velos||Array(VELO_DEFAULT).fill(''),'mph'));
+    const f=document.createElement('div');f.className='field';
+    f.innerHTML='<div class="fl">Pop time (range, seconds)</div>';
+    const g=document.createElement('div');g.className='grid2';
+    g.innerHTML=`<input class="fin" id="popLo" inputmode="decimal" placeholder="2.01" value="${d.popLo||''}">
+                 <input class="fin" id="popHi" inputmode="decimal" placeholder="2.06" value="${d.popHi||''}">`;
+    f.appendChild(g);wrap.appendChild(f);
+  }else if(st==='Physical'){
+    const html=`
+      <div class="field"><div class="fl">Height</div>
+        <div class="grid2">
+          <input class="fin" id="htFt" inputmode="numeric" placeholder="ft" value="${d.htFt||''}">
+          <input class="fin" id="htIn" inputmode="decimal" placeholder="in" value="${d.htIn||''}">
+        </div></div>
+      <div class="field"><div class="fl">Weight (lbs)</div>
+        <input class="fin" id="wt" inputmode="decimal" placeholder="185" value="${d.wt||''}"></div>
+      <div class="field"><div class="fl">Grip strength (lbs)</div>
+        <div class="grid2">
+          <input class="fin" id="gripR" inputmode="decimal" placeholder="R  136.2" value="${d.gripR||''}">
+          <input class="fin" id="gripL" inputmode="decimal" placeholder="L  143.2" value="${d.gripL||''}">
+        </div></div>
+      <div class="field"><div class="fl">60-yard dash (sec, optional)</div>
+        <input class="fin" id="dash60" inputmode="decimal" placeholder="6.84" value="${d.dash60||''}"></div>`;
+    const f=document.createElement('div');f.innerHTML=html;wrap.appendChild(f);
+  }
+}
+function veloBlock(vals,unit){
+  const wrap=document.createElement('div');
+  const f=document.createElement('div');f.className='field';
+  f.innerHTML='<div class="fl">Velocity reps</div>';
+  const reps=document.createElement('div');reps.className='reps';reps.id='repsBox';
+  vals.forEach((v,i)=>reps.appendChild(repRow(i,v,unit)));
+  f.appendChild(reps);
+  const add=document.createElement('button');add.className='addrep';add.textContent='+ Add rep';
+  add.addEventListener('click',()=>{const i=reps.children.length;reps.appendChild(repRow(i,'',unit));});
+  f.appendChild(add);wrap.appendChild(f);return wrap;
+}
+function repRow(i,v,unit){
+  const row=document.createElement('div');row.className='rep';
+  row.innerHTML=`<span class="rl">Rep ${i+1}</span>
+    <input inputmode="decimal" value="${v??''}" placeholder="--" data-rep>
+    <span class="unit">${unit}</span>`;
+  return row;
+}
+function collectEntry(st){
+  const d={};
+  if(st==='Infield'||st==='Outfield'||st==='Catching'){
+    d.velos=[...document.querySelectorAll('#repsBox [data-rep]')].map(i=>norm(i.value));
+    while(d.velos.length&&d.velos[d.velos.length-1]==='')d.velos.pop();
+  }
+  if(st==='Catching'){d.popLo=norm(document.getElementById('popLo').value);d.popHi=norm(document.getElementById('popHi').value);}
+  if(st==='Physical'){
+    d.htFt=norm(document.getElementById('htFt').value);d.htIn=norm(document.getElementById('htIn').value);
+    d.wt=norm(document.getElementById('wt').value);
+    d.gripR=norm(document.getElementById('gripR').value);d.gripL=norm(document.getElementById('gripL').value);
+    d.dash60=norm(document.getElementById('dash60').value);
+  }
+  return d;
+}
+function validateEntry(st,d){
+  const errs=[];
+  const isNum=v=>v===''||(!isNaN(parseFloat(v))&&isFinite(v));
+  if(d.velos)d.velos.forEach((v,i)=>{if(!isNum(v))errs.push(`Rep ${i+1} isn't a number`);});
+  if(st==='Catching'){
+    if(!isNum(d.popLo)||!isNum(d.popHi))errs.push('Pop time must be numbers');
+    if(d.popLo&&d.popHi&&parseFloat(d.popLo)>parseFloat(d.popHi))errs.push('Pop low is higher than pop high');
+  }
+  if(st==='Physical'){
+    [['htFt','Height ft'],['htIn','Height in'],['wt','Weight'],['gripR','Right grip'],['gripL','Left grip'],['dash60','60-yard']]
+      .forEach(([k,l])=>{if(!isNum(d[k]))errs.push(l+' must be a number');});
+    if(d.htIn&&parseFloat(d.htIn)>=12)errs.push('Height inches should be under 12');
+  }
+  return errs;
+}
+function doSave(){
+  const d=collectEntry(station);const errs=validateEntry(station,d);
+  if(errs.length){toast(errs[0],true);return false;}
+  const r=rec(entryId);r[station]=d;r[station].at=Date.now();save();flash();return true;
+}
+document.getElementById('entrySave').addEventListener('click',()=>{if(doSave())go('lookup');});
+document.getElementById('entryNext').addEventListener('click',()=>{
+  if(!doSave())return;pickColor=null;pickNum='';
+  document.querySelectorAll('.cp').forEach(c=>c.classList.remove('sel','dim'));
+  updateNum();document.getElementById('lookupMiss').classList.add('hidden');go('lookup');
+});
+
+/* ---------- SETTINGS / ROSTER ---------- */
+function renderSettings(){
+  refreshCounts();
+  const s=document.getElementById('rosterSummary');
+  if(!roster.length)s.textContent='No roster loaded yet. Load your event CSV below.';
+  else{
+    const ci=Object.values(data).filter(r=>r.checkedIn).length;
+    s.innerHTML=`<b style="color:var(--ink)">${roster.length}</b> players loaded · <b style="color:var(--ok)">${ci}</b> checked in.`;
+  }
+  document.getElementById('csvPreview').innerHTML='';
+}
+document.getElementById('csvInput').addEventListener('change',e=>{
+  const file=e.target.files[0];if(!file)return;
+  const reader=new FileReader();
+  reader.onload=()=>{try{importCSV(reader.result);}catch(err){toast('Could not read CSV: '+err.message,true);}};
+  reader.onerror=()=>toast('File read failed',true);
+  reader.readAsText(file);e.target.value='';
+});
+function importCSV(text){
+  const rows=parseDelimited(text);
+  if(rows.length<2){toast('File looks empty',true);return;}
+  const head=rows[0].map(h=>{const t=h.trim();if(t==='#'||t==='#'||/^#$/.test(t))return'number';return t.toLowerCase().replace(/[^a-z0-9]/g,'');});
+  const idx=names=>{for(const n of names){const i=head.indexOf(n);if(i>=0)return i;}return -1;};
+  const iName=idx(['name','playername','fullname','player']);
+  const iLast=idx(['last','lastname','lname','surname']);
+  const iFirst=idx(['first','firstname','fname','given']);
+  const iNum=idx(['jerseynumber','jerseyno','jerseynum','number','num','no','jersey','#']);
+  const iColor=idx(['jerseycolor','jerseycolour','color','colour']);
+  const iPos=idx(['positions','position','pos']);
+  const iGrad=idx(['gradyear','grad','classyear','classof','class','year']);
+  const iTeam=idx(['team','organization','org','school']);
+  const hasName=iName>=0||(iFirst>=0&&iLast>=0)||iLast>=0||iFirst>=0;
+  if(!hasName){toast('No name column found (need "name", or "First"+"Last")',true);return;}
+  const next=[];const seen={};
+  for(let r=1;r<rows.length;r++){
+    const row=rows[r];if(!row.length)continue;
+    let name='';
+    if(iName>=0)name=norm(row[iName]);
+    else name=[norm(iFirst>=0?row[iFirst]:''),norm(iLast>=0?row[iLast]:'')].filter(Boolean).join(' ');
+    if(!name)continue;
+    let color=iColor>=0?cleanColor(row[iColor]):'';
+    let number=iNum>=0?cleanNum(row[iNum]):'';
+    const positions=iPos>=0?norm(row[iPos]).split(/[;,/|]/).map(norm).filter(Boolean):[];
+    const p={id:'p'+r+'_'+Math.random().toString(36).slice(2,7),name,
+      color,number,positions,grad:iGrad>=0?norm(row[iGrad]):'',team:iTeam>=0?norm(row[iTeam]):''};
+    if(color&&number!==''){const k=keyJersey(color,number);if(seen[k])duplicateWarn(k,p.name,seen[k]);seen[k]=p.name;}
+    next.push(p);
+  }
+  showPreview(next);
+}
+let pendingRoster=null;
+function showPreview(next){
+  pendingRoster=next;
+  const box=document.getElementById('csvPreview');
+  const withJersey=next.filter(p=>p.color&&p.number!=='').length;
+  let html=`<div class="mini" style="margin-top:14px"><b style="color:var(--ink)">${next.length}</b> players parsed · ${withJersey} with jerseys.</div>`;
+  html+='<table class="prev"><tr><th>Name</th><th>Jersey</th><th>Positions</th></tr>';
+  next.slice(0,6).forEach(p=>{html+=`<tr><td>${esc(p.name)}</td><td>${p.color?esc(p.color)+' '+p.number:'—'}</td><td>${p.positions.map(esc).join(', ')||'—'}</td></tr>`;});
+  html+='</table>';
+  html+=`<button class="cta" id="commitRoster" style="margin-top:14px">Replace roster with these ${next.length} players</button>`;
+  if(roster.length)html+='<div class="mini danger" style="margin-top:8px">This replaces the current roster on this device. Check-in and entered data are kept where jersey color+number still match.</div>';
+  box.innerHTML=html;
+  document.getElementById('commitRoster').addEventListener('click',commitRoster);
+}
+function commitRoster(){
+  // preserve existing data by jersey key where possible
+  const oldByKey={};roster.forEach(p=>{if(p.color&&p.number!==''&&data[p.id])oldByKey[keyJersey(p.color,p.number)]=data[p.id];});
+  const newData={};
+  pendingRoster.forEach(p=>{const k=p.color&&p.number!==''?keyJersey(p.color,p.number):null;if(k&&oldByKey[k])newData[p.id]=oldByKey[k];});
+  roster=pendingRoster;data=newData;pendingRoster=null;save();
+  refreshCounts();renderSettings();toast('Roster loaded');
+}
+let dupWarned=false;
+function duplicateWarn(k,a,b){if(!dupWarned){toast('Heads up: duplicate jersey '+k.replace('#',' ')+' ('+b+' & '+a+')',true);dupWarned=true;setTimeout(()=>dupWarned=false,3000);}}
+function cleanColor(v){v=norm(v).toLowerCase();return COLORS.find(c=>c.toLowerCase()===v)||(v?cap(v):'');}
+function cleanNum(v){v=norm(v);if(v==='')return'';const n=parseInt(v,10);return isNaN(n)?'':String(Math.max(0,Math.min(99,n)));}
+function cap(s){return s.charAt(0).toUpperCase()+s.slice(1);}
+
+document.getElementById('addManual').addEventListener('click',()=>{
+  const name=prompt('Player name');if(!name||!norm(name))return;
+  const color=prompt('Jersey color (Black/White/Grey/Red, or leave blank)','');
+  let number='';if(color&&norm(color))number=prompt('Jersey number (0–99)','')||'';
+  const positions=prompt('Positions (separate with ; )','')||'';
+  const p={id:'m'+Date.now(),name:norm(name),color:cleanColor(color),number:cleanNum(number),
+    positions:positions.split(/[;,]/).map(norm).filter(Boolean),grad:'',team:''};
+  roster.push(p);save();refreshCounts();renderSettings();toast('Added '+p.name);
+});
+
+document.getElementById('resetAll').addEventListener('click',()=>{
+  if(!confirm('Erase ALL roster and entered data on this iPad? This cannot be undone.'))return;
+  roster=[];data={};localStorage.removeItem(LS_ROSTER);localStorage.removeItem(LS_DATA);
+  refreshCounts();renderSettings();toast('Device data erased');
+});
+
+/* ---------- EXPORT ---------- */
+document.querySelectorAll('[data-export]').forEach(b=>b.addEventListener('click',()=>exportCSV(b.dataset.export)));
+function exportCSV(kind){
+  if(!roster.length){toast('Nothing to export — load a roster first',true);return;}
+  let head,rows;
+  const base=p=>[p.name,p.color,p.number,p.positions.join('; ')];
+  if(kind==='checkin'){
+    head=['name','jersey_color','jersey_number','positions','checked_in','checkin_time'];
+    rows=roster.map(p=>{const r=rec(p.id);return base(p).concat([r.checkedIn?'YES':'NO',r.checkinAt?new Date(r.checkinAt).toLocaleString():'']);});
+  }else if(kind==='all'){
+    head=['name','jersey_color','jersey_number','positions',
+      'IF_velo_1','IF_velo_2','IF_velo_3','IF_velo_4','IF_velo_5','IF_velo_max',
+      'OF_velo_max','C_velo_max','pop_low','pop_high',
+      'height_ft','height_in','height_total_in','weight_lbs','grip_R_lbs','grip_L_lbs','dash_60'];
+    rows=roster.map(p=>{const r=rec(p.id);
+      const IF=(r.Infield||{}).velos||[],OF=(r.Outfield||{}).velos||[],C=r.Catching||{},PH=r.Physical||{};
+      const v=(a,i)=>a[i]??'';const mx=a=>{const n=a.map(parseFloat).filter(x=>!isNaN(x));return n.length?Math.max(...n):'';};
+      const htTot=(PH.htFt&&PH.htIn!=='')?(parseFloat(PH.htFt)*12+parseFloat(PH.htIn||0)):'';
+      return base(p).concat([v(IF,0),v(IF,1),v(IF,2),v(IF,3),v(IF,4),mx(IF),
+        mx(OF),mx((C.velos||[])),C.popLo||'',C.popHi||'',
+        PH.htFt||'',PH.htIn||'',htTot,PH.wt||'',PH.gripR||'',PH.gripL||'',PH.dash60||'']);
+    });
+  }else{ // single station
+    const st=kind;
+    if(st==='Physical'){
+      head=['name','jersey_color','jersey_number','height_ft','height_in','height_total_in','weight_lbs','grip_R_lbs','grip_L_lbs','dash_60'];
+      rows=roster.map(p=>{const d=(rec(p.id).Physical)||{};const tot=(d.htFt&&d.htIn!=='')?(parseFloat(d.htFt)*12+parseFloat(d.htIn||0)):'';
+        return [p.name,p.color,p.number,d.htFt||'',d.htIn||'',tot,d.wt||'',d.gripR||'',d.gripL||'',d.dash60||''];});
+    }else{
+      const maxReps=Math.max(5,...roster.map(p=>((rec(p.id)[st]||{}).velos||[]).length));
+      head=['name','jersey_color','jersey_number'];for(let i=1;i<=maxReps;i++)head.push('velo_'+i);head.push('velo_max');
+      if(st==='Catching')head.push('pop_low','pop_high');
+      rows=roster.map(p=>{const d=(rec(p.id)[st])||{};const vs=d.velos||[];
+        const n=vs.map(parseFloat).filter(x=>!isNaN(x));const row=[p.name,p.color,p.number];
+        for(let i=0;i<maxReps;i++)row.push(vs[i]??'');row.push(n.length?Math.max(...n):'');
+        if(st==='Catching')row.push(d.popLo||'',d.popHi||'');return row;});
+    }
+  }
+  download(kind+'_'+stamp()+'.csv',toCSV([head,...rows]));
+  toast('Exported '+kind+' CSV');
+}
+function toCSV(rows){return rows.map(r=>r.map(cell=>{const s=String(cell??'');return /[",\n]/.test(s)?'"'+s.replace(/"/g,'""')+'"':s;}).join(',')).join('\n');}
+function download(name,text){
+  const blob=new Blob([text],{type:'text/csv'});const url=URL.createObjectURL(blob);
+  const a=document.createElement('a');a.href=url;a.download=name;document.body.appendChild(a);a.click();
+  setTimeout(()=>{URL.revokeObjectURL(url);a.remove();},500);
+}
+function stamp(){const d=new Date();const p=n=>String(n).padStart(2,'0');return d.getFullYear()+p(d.getMonth()+1)+p(d.getDate())+'_'+p(d.getHours())+p(d.getMinutes());}
+
+/* ---------- delimited parse (auto tab/comma) ---------- */
+function parseDelimited(text){
+  text=text.replace(/\r\n/g,'\n').replace(/\r/g,'\n');
+  const firstLine=text.split('\n')[0]||'';
+  const delim=(firstLine.split('\t').length>firstLine.split(',').length)?'\t':',';
+  return parseCSV(text,delim);
+}
+function parseCSV(text,delim){
+  delim=delim||',';
+  text=text.replace(/\r\n/g,'\n').replace(/\r/g,'\n');
+  const rows=[];let row=[],cell='',q=false;
+  for(let i=0;i<text.length;i++){const c=text[i];
+    if(q){if(c==='"'){if(text[i+1]==='"'){cell+='"';i++;}else q=false;}else cell+=c;}
+    else{if(c==='"')q=true;else if(c===delim){row.push(cell);cell='';}
+      else if(c==='\n'){row.push(cell);rows.push(row);row=[];cell='';}
+      else cell+=c;}
+  }
+  if(cell!==''||row.length){row.push(cell);rows.push(row);}
+  return rows.filter(r=>r.some(c=>norm(c)!==''));
+}
+
+/* ---------- util ---------- */
+function esc(s){return String(s??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));}
+
+refreshCounts();renderHomeStatus();
+</script>
+</body>
+</html>
